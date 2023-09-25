@@ -3,6 +3,7 @@ from CircularBuffer import *
 
 import threading
 import numpy
+import scipy
 import math
 
 class DecimationThread(threading.Thread):
@@ -25,6 +26,10 @@ class DecimationThread(threading.Thread):
                 while self._incomingBuffer.unreadCount() < self._samplesPerDecimation:
                     logging.info("DecimationThread: waiting for samples: unreadCount: %d", self._incomingBuffer.unreadCount())
                     self._notifyCondition.wait()
-            rawBuffer = self._incomingBuffer.read(self._samplesPerDecimation)
-            decimatedBuffer = np.empty(self._countAfterDecimation, dtype=np.single)
+            decimatedBuffer = self._incomingBuffer.read(self._samplesPerDecimation)
+            logging.info("DecimationThread: pre decimatedBuffer: %s", decimatedBuffer.shape)
+            decimatedBuffer = scipy.signal.decimate(decimatedBuffer, 10, ftype='fir')
+            decimatedBuffer = scipy.signal.decimate(decimatedBuffer, 10, ftype='fir')
+            decimatedBuffer = scipy.signal.decimate(decimatedBuffer, 8, ftype='fir')
+            logging.info("DecimationThread: decimatedBuffer: %s", decimatedBuffer.shape)
             self._decimatedBuffer.write(decimatedBuffer)
