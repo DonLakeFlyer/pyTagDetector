@@ -11,7 +11,7 @@ class UDPReaderThread(threading.Thread):
     def __init__ (self):
         super().__init__()
 
-        self._incomingBuffer    = CircularBuffer("Reader", Config.incomingSampsForKPulses * 2, np.csingle)
+        self._incomingBuffer    = CircularBuffer("Reader", Config.nIncomingForKPulses * 2, np.csingle)
         self.udpRXSocket        = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._decimationThread  = DecimationThread(self._incomingBuffer)
 

@@ -43,7 +43,7 @@ class CircularBuffer:
         return ret    
 
     def read(self, nElements: int, overlap: int = 0):
-        logging.info("Reading samples from %s: readCount:unreadCount %d:%d", self._name, nElements, self.unreadCount())
+        logging.debug("Reading samples from %s: readCount:unreadCount %d:%d", self._name, nElements, self.unreadCount())
         with self._lock:
             ret = np.empty(nElements, dtype = self._dtype)
             ret[:overlap] = self._read(overlap, True)
