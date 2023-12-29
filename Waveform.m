@@ -4,15 +4,15 @@ import numpy
 from scipy import signal
 
 class Waveform:
-    stftWindow = signal.windows.boxcar(Config.nSTFTSegment)
+    stftWindow = signal.windows.boxcar(Config.nSTFTSegmentForSinglePulse)
 
     def __init__(self, samples):
         self.stftFreqs, self.stftTimes, self.psdSpectro = 
             signal.spectrogram(
                 samples, 
                 Config.decimatedSampleRate, 
-                nperseg         = Config.nSTFTSegment, 
-                noverlap        = Config.nSTFTSegmentOverlap, 
+                nperseg         = Config.nSTFTSegmentForSinglePulse, 
+                noverlap        = Config.nSTFTSegmentForSinglePulseOverlap, 
                 window          = stftWindow,
                 scaling         = "density",
                 mode            = "psd",

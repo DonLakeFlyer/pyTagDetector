@@ -19,12 +19,14 @@ class Config:
     nDecimatedPulseWidth        = math.floor(pulseWidthSecs * decimatedSampleRate)
     nDecimatedPulseUncertainty  = math.floor(intraPulseUncertaintySecs * decimatedSampleRate)
     nDecimatedPulseJitter       = math.floor(intraPulseJittersSecs * decimatedSampleRate)
-    stftOverlapFraction         = 0.5
-    nSTFTSegment                = nDecimatedPulseWidth
-    nSTFTSegmentOverlap         = math.floor(nSTFTSegment * stftOverlapFraction)
-    nSTFTSegmentNotOverlapped   = nSTFTSegment - nSTFTSegmentOverlap
-    nSTFTWindowsIntraPulse      = math.floor(nDecimatedIntraPulse / nSTFTSegmentNotOverlapped)
-    nDecimatedForKPulses        = (k * (nDecimatedIntraPulse + nDecimatedPulseUncertainty)) + nDecimatedPulseJitter + nSTFTSegmentOverlap
+    
+    stftOverlapFraction                     = 0.5                                                               # 50% overlap
+    nSTFTSegmentForSinglePulse              = nDecimatedPulseWidth                                              # STFT window is large enough to contain a single pulse    
+    nSTFTSegmentForSinglePulseOverlap       = math.floor(nSTFTSegmentForSinglePulse * stftOverlapFraction)
+    nSTFTSegmentForSinglePulseNotOverlapped = nSTFTSegmentForSinglePulse - nSTFTSegmentForSinglePulseOverlap
+    nSTFTBucketsIntraPulse                  = math.floor(nDecimatedIntraPulse / nSTFTSegmentForSinglePulseNotOverlapped)
+    
+    nDecimatedForKPulses        = (k * (nDecimatedIntraPulse + nDecimatedPulseUncertainty)) + nDecimatedPulseJitter + nSTFTSegmentForSinglePulseOverlap
     nDecimatedOverlap           = 2 * ((k * nDecimatedPulseUncertainty) + nDecimatedPulseJitter)
     nDecimatedForKPulsesWithOverlap = nDecimatedForKPulses + nDecimatedOverlap
     nIncomingForKPulses         = nDecimatedForKPulsesWithOverlap * decimationFactor

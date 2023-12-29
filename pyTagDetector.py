@@ -14,51 +14,76 @@ def pyTagDetector():
 
     notifyCondition = udpReader.decimatedBuffer().registerItemCountCondition(Config.nDecimatedForKPulsesWithOverlap)
 
-    stftWindow = signal.windows.boxcar(Config.nSTFTSegment)
+    stftWindow = signal.windows.boxcar(Config.nSTFTSegmentForSinglePulse)
 
-    logging.info("%d %d", Config.nDecimatedForKPulses, Config.nSTFTSegmentOverlap)
+    logging.info("%d %d", Config.nDecimatedForKPulses, Config.nSTFTSegmentForSinglePulseOverlap)
 
     display = False
+
     while True:
+        # Wait for enough samples to be decimated to cover the K group
         with notifyCondition:
             while udpReader.decimatedBuffer().unreadCount() < Config.nDecimatedForKPulsesWithOverlap:
                 notifyCondition.wait()
         decimatedBuffer = udpReader.decimatedBuffer().read(Config.nDecimatedForKPulses, Config.nDecimatedOverlap)
-        stftFreqs, stftWindowTimes, psdSpectro = signal.spectrogram(
+
+        # Compute the STFT for the decimated samples:
+        #   psdSpecro is a 2D array of shape (frequencies, windows)
+        #   rows are frequencies
+        #   columns are time windows
+        stftFreqs, stftBucketTimes, psdSpectro = signal.spectrogram(
                                 decimatedBuffer, 
                                 Config.decimatedSampleRate, 
-                                nperseg=Config.nSTFTSegment, 
-                                noverlap=Config.nSTFTSegmentOverlap, 
-                                window=stftWindow,
-                                scaling="density",
-                                mode="psd",
-                                return_onesided=False)
+                                nperseg         = Config.nSTFTSegmentForSinglePulse, 
+                                noverlap        = Config.nSTFTSegmentForSinglePulseOverlap, 
+                                window          = stftWindow,
+                                scaling         = "density",
+                                mode            = "psd",
+                                return_onesided =False)
+        nSTFTFreqs      = stftFreqs.shape[0]
+        nSTFTBuckets    = stftBucketTimes.shape[0]
+        
         if display:
-            display = False
-            plt.pcolormesh(t, f, psdSpectro, shading='gouraud')
-            plt.ylabel('Frequency [Hz]')
-            plt.xlabel('Time [sec]')
-            plt.show()
-        logging.info("stft %s %d %d %d", psdSpectro.shape, Config.nSTFTSegment, Config.nDecimatedIntraPulse, Config.nDecimatedForKPulses)
+            #display = False
+            plt.pcolormesh  (stftBucketTimes, stftFreqs, psdSpectro, shading='gouraud')
+            plt.ylabel      ('Frequency [Hz]')
+            plt.xlabel      ('Time [sec]')
+            plt.show        ()
+        logging.info("stft shape(%s) %d %d %d", psdSpectro.shape, Config.nSTFTSegmentForSinglePulse, Config.nDecimatedIntraPulse, Config.nDecimatedForKPulses)
 
-        index = 0
-        pulsePositions = numpy.zeros(psdSpectro.shape[1], dtype = numpy.int32)
-        logging.info("Pulse positions %s", pulsePositions.shape)
-        while index < pulsePositions.shape[0]:
-            pulsePositions[index] = 1
-            index += Config.nSTFTWindowsIntraPulse
+        # Create initial pulse position matrix:
+        #   It is as large as there are stft buckets
+        #   There is a 1 in the position of the buckets which may contain a possible pulse
+        #   Iniitially, the first bucket of each pulse is the first bucket of the STFT
 
-        # Create empty incoherent sum position matrix
-        summationMatrix = numpy.zeros((psdSpectro.shape[1], Config.nSTFTWindowsIntraPulse), dtype = numpy.int32)
+        pulseBucketPositions = numpy.zeros(nSTFTBuckets, dtype = numpy.int32)
         index = 0
-        while index < Config.nSTFTWindowsIntraPulse:
-            summationMatrix[:, index] = pulsePositions
-            pulsePositions = numpy.roll(pulsePositions, 1)
+        while index < nSTFTBuckets:
+            pulseBucketPositions[index] = 1
+            index += Config.nSTFTBucketsIntraPulse
+
+        # Create two dimensional incoherent sum matrix:
+        #   1, 0, ..., 0
+        #   0, 1, ..., 0
+        #   ...
+        #   0, 0, ..., 1
+        #
+        #   There is a column for each possible pulse position k group in time
+
+        summationMatrix = numpy.zeros((nSTFTBuckets, Config.nSTFTBucketsIntraPulse), dtype = numpy.int32)
+        index = 0
+        while index < Config.nSTFTBucketsIntraPulse:
+            summationMatrix[:, index] = pulseBucketPositions
+            pulseBucketPositions = numpy.roll(pulseBucketPositions, 1)  # Shift the pulse positions by one bucket
             index += 1
 
-        #allFreqs = numpy.sum(S, axis = 0)
-        #incoSum = numpy.dot(allFreqs, summationMatrix)
         incoSum = numpy.dot(psdSpectro, summationMatrix)
+
+        if display:
+            plt.pcolormesh  (stftBucketTimes[:incoSum.shape[1]], stftFreqs, incoSum, shading='gouraud')
+            plt.ylabel      ('Frequency [Hz]')
+            plt.xlabel      ('Time [sec]')
+            plt.show        ()
 
         #plt.pcolormesh(t[:incoSum.shape[1]], stftFreqs, incoSum, shading='gouraud')
         #plt.ylabel('Frequency [Hz]')
@@ -66,14 +91,22 @@ def pyTagDetector():
         #plt.show()
 
         argmaxByFreq = numpy.argmax(incoSum, axis=1)
-        maxFlattenedIndex = np.argmax(incoSum)
-        row = math.floor(maxFlattenedIndex / incoSum.shape[1])
-        col = maxFlattenedIndex % incoSum.shape[1]
-        incoSumRow = incoSum[row]
+        maxFlattenedIndex = numpy.argmax(incoSum)
+        sortedFlattenedIndex = numpy.argsort(incoSum, axis=None)[::-1]
+        for index in range(10):
+            maxIndex = sortedFlattenedIndex[index]
+            maxFreqIndex = math.floor(maxIndex / incoSum.shape[1])
+            maxTimeIndex = maxIndex % incoSum.shape[1]
+            logging.info("SORTED freq: %f time: %f value: %e", stftFreqs[maxFreqIndex], stftBucketTimes[maxTimeIndex], incoSum[maxFreqIndex, maxTimeIndex])
+        freqIndex = math.floor(maxFlattenedIndex / incoSum.shape[1])
+        timeIndex = maxFlattenedIndex % incoSum.shape[1]
+        incoSumRow = incoSum[freqIndex]
+        slice = incoSum[freqIndex-5:freqIndex+5, :]
+        #print(slice)
         moving = numpy.convolve(incoSumRow, numpy.ones(3), "valid") / 3
-        sRow = psdSpectro[row]
-        freq = stftFreqs[row]
-        logging.info("freq: %f time: %f", freq, stftWindowTimes[col])
+        sRow = psdSpectro[freqIndex]
+        freq = stftFreqs[freqIndex]
+        logging.info("MAX freq: %f time: %f value: %e", freq, stftBucketTimes[timeIndex], incoSum[freqIndex, timeIndex])
 
         meanPSD = numpy.mean(psdSpectro, axis=1)
 
