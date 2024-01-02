@@ -5,6 +5,8 @@ import logging
 import numpy
 from scipy import signal
 from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import axes3d
+from matplotlib import cm
 
 def pyTagDetector():
     logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s |  %(filename)s:%(lineno)d')
@@ -18,14 +20,19 @@ def pyTagDetector():
 
     logging.info("%d %d", Config.nDecimatedForKPulses, Config.nSTFTSegmentForSinglePulseOverlap)
 
-    display = False
+    display = True
+    waitCount = 1
 
     while True:
         # Wait for enough samples to be decimated to cover the K group
         with notifyCondition:
             while udpReader.decimatedBuffer().unreadCount() < Config.nDecimatedForKPulsesWithOverlap:
                 notifyCondition.wait()
+
         decimatedBuffer = udpReader.decimatedBuffer().read(Config.nDecimatedForKPulses, Config.nDecimatedOverlap)
+        if waitCount < 3:
+            waitCount += 1
+            continue 
 
         # Compute the STFT for the decimated samples:
         #   psdSpecro is a 2D array of shape (frequencies, windows)
@@ -45,10 +52,20 @@ def pyTagDetector():
         
         if display:
             #display = False
-            plt.pcolormesh  (stftBucketTimes, stftFreqs, psdSpectro, shading='gouraud')
-            plt.ylabel      ('Frequency [Hz]')
-            plt.xlabel      ('Time [sec]')
-            plt.show        ()
+            #plt.pcolormesh  (stftBucketTimes, stftFreqs, psdSpectro, shading='gouraud')
+            plt.xlabel      ('Frequency [Hz]')
+            plt.ylabel      ('Time [sec]')
+            fig = plt.figure()
+            ax = fig.add_subplot(projection='3d')
+            #ax = fig.gca(projection='3d')
+
+            # Grab some test data.
+            #X, Y, Z = axes3d.get_test_data(0.05)
+
+            # Plot a basic wireframe.
+            #ax.plot_wireframe(stftFreqs, stftBucketTimes, psdSpectro, rstride=10, cstride=10)
+            ax.plot_surface(stftFreqs[:, None], stftBucketTimes[None, :], psdSpectro, cmap=cm.coolwarm)
+            plt.show()        
         logging.info("stft shape(%s) %d %d %d", psdSpectro.shape, Config.nSTFTSegmentForSinglePulse, Config.nDecimatedIntraPulse, Config.nDecimatedForKPulses)
 
         # Create initial pulse position matrix:
