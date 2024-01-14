@@ -8,6 +8,31 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
 from matplotlib import cm
 
+def plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectr, freqIndex):
+    plt.ylabel('Power')
+    plt.xlabel('Time [sec]')
+    plt.plot(stftBucketTimes, psdSpectr[freqIndex])
+    plt.show()
+
+def plotSurface(stftFreqs, stftBucketTimes, psdSpectro):
+    plt.xlabel('Frequency [Hz]')
+    plt.ylabel('Time [sec]')
+    fig             = plt.figure()
+    ax              = fig.add_subplot(projection='3d')
+    nSTFTFreqs      = stftFreqs.shape[0]
+    nSTFTBuckets    = stftBucketTimes.shape[0]
+    ax.plot_surface(stftFreqs[:, None], stftBucketTimes[None, :], psdSpectro, cmap=cm.coolwarm, rcount=nSTFTFreqs, ccount=nSTFTBuckets)
+    plt.show()        
+
+def plotColorMesh(stftFreqs, stftBucketTimes, psdSpectro):
+    plt.pcolormesh(stftBucketTimes, stftFreqs, psdSpectro, shading='gouraud')
+    plt.ylabel('Frequency [Hz]')
+    plt.xlabel('Time [sec]')
+    plt.show()   
+
+def plot(stftFreqs, stftBucketTimes, psdSpectro):
+    plotColorMesh(stftFreqs, stftBucketTimes, psdSpectro)
+
 def pyTagDetector():
     logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s |  %(filename)s:%(lineno)d')
 
@@ -20,7 +45,7 @@ def pyTagDetector():
 
     logging.info("%d %d", Config.nDecimatedForKPulses, Config.nSTFTSegmentForSinglePulseOverlap)
 
-    display = True
+    display = False
     waitCount = 1
 
     while True:
@@ -36,8 +61,8 @@ def pyTagDetector():
 
         # Compute the STFT for the decimated samples:
         #   psdSpecro is a 2D array of shape (frequencies, windows)
-        #   rows are frequencies
-        #   columns are time windows
+        #   rows are frequencies (axis = 0)
+        #   columns are time windows (axis = 1)
         stftFreqs, stftBucketTimes, psdSpectro = signal.spectrogram(
                                 decimatedBuffer, 
                                 Config.decimatedSampleRate, 
@@ -51,21 +76,7 @@ def pyTagDetector():
         nSTFTBuckets    = stftBucketTimes.shape[0]
         
         if display:
-            #display = False
-            #plt.pcolormesh  (stftBucketTimes, stftFreqs, psdSpectro, shading='gouraud')
-            plt.xlabel      ('Frequency [Hz]')
-            plt.ylabel      ('Time [sec]')
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-            #ax = fig.gca(projection='3d')
-
-            # Grab some test data.
-            #X, Y, Z = axes3d.get_test_data(0.05)
-
-            # Plot a basic wireframe.
-            #ax.plot_wireframe(stftFreqs, stftBucketTimes, psdSpectro, rstride=10, cstride=10)
-            ax.plot_surface(stftFreqs[:, None], stftBucketTimes[None, :], psdSpectro, cmap=cm.coolwarm)
-            plt.show()        
+            plot(stftFreqs, stftBucketTimes, psdSpectro)
         logging.info("stft shape(%s) %d %d %d", psdSpectro.shape, Config.nSTFTSegmentForSinglePulse, Config.nDecimatedIntraPulse, Config.nDecimatedForKPulses)
 
         # Create initial pulse position matrix:
@@ -79,7 +90,7 @@ def pyTagDetector():
             pulseBucketPositions[index] = 1
             index += Config.nSTFTBucketsIntraPulse
 
-        # Create two dimensional incoherent sum matrix:
+        # Create two dimensional incoherent sum matrixby shifting the pulse position matrix by one bucket at a time
         #   1, 0, ..., 0
         #   0, 1, ..., 0
         #   ...
@@ -97,17 +108,8 @@ def pyTagDetector():
         incoSum = numpy.dot(psdSpectro, summationMatrix)
 
         if display:
-            plt.pcolormesh  (stftBucketTimes[:incoSum.shape[1]], stftFreqs, incoSum, shading='gouraud')
-            plt.ylabel      ('Frequency [Hz]')
-            plt.xlabel      ('Time [sec]')
-            plt.show        ()
+            plot(stftFreqs, stftBucketTimes[:incoSum.shape[1]], incoSum)
 
-        #plt.pcolormesh(t[:incoSum.shape[1]], stftFreqs, incoSum, shading='gouraud')
-        #plt.ylabel('Frequency [Hz]')
-        #plt.xlabel('Time [sec]')
-        #plt.show()
-
-        argmaxByFreq = numpy.argmax(incoSum, axis=1)
         maxFlattenedIndex = numpy.argmax(incoSum)
         sortedFlattenedIndex = numpy.argsort(incoSum, axis=None)[::-1]
         for index in range(10):
@@ -119,13 +121,34 @@ def pyTagDetector():
         timeIndex = maxFlattenedIndex % incoSum.shape[1]
         incoSumRow = incoSum[freqIndex]
         slice = incoSum[freqIndex-5:freqIndex+5, :]
-        #print(slice)
         moving = numpy.convolve(incoSumRow, numpy.ones(3), "valid") / 3
         sRow = psdSpectro[freqIndex]
         freq = stftFreqs[freqIndex]
-        logging.info("MAX freq: %f time: %f value: %e", freq, stftBucketTimes[timeIndex], incoSum[freqIndex, timeIndex])
 
-        meanPSD = numpy.mean(psdSpectro, axis=1)
+        # Calculate the average noise level in incoSum at freqIndex
+        # Mask out the position of the pulse using weights
+        maxFreqData = incoSum[freqIndex, :]
+        weights = numpy.ones(maxFreqData.shape)
+        weights[max(0, timeIndex-1) : min(weights.shape[0], timeIndex+2)] = 0
+        print(timeIndex, weights)
+        avgNoise = numpy.average(maxFreqData)
+        avgNoise = numpy.average(maxFreqData, weights=weights)
+
+        maxPower = incoSum[freqIndex, timeIndex]
+        logging.info("MAX freq: %f time: %f value: %e noise: %e snr: %e freqIndex: %d", freq, stftBucketTimes[timeIndex], maxPower, avgNoise, 10 * math.log((maxPower - avgNoise) / avgNoise), freqIndex)
+
+        #plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoSum.shape[1]], incoSum, freqIndex)
+        #plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectro, freqIndex)
+        delta = 20
+        #plotSurface(stftFreqs[freqIndex-delta:freqIndex+delta], stftBucketTimes, psdSpectro[freqIndex-delta:freqIndex+delta, :])
+
+        # Look for the peak of the next pulse
+        nextPulseTimeIndex = timeIndex + Config.nSTFTBucketsIntraPulse
+        pulseBucketFudge = 5
+        nextPulseBuckets = psdSpectro[freqIndex, nextPulseTimeIndex-pulseBucketFudge:nextPulseTimeIndex+pulseBucketFudge]
+        maxIndex = numpy.argmax(nextPulseBuckets)
+        nextPulseTimeIndex = nextPulseTimeIndex - pulseBucketFudge + maxIndex
+        logging.info("NEXT time: %f delta: %f value: %e", stftBucketTimes[nextPulseTimeIndex], stftBucketTimes[timeIndex] - stftBucketTimes[nextPulseTimeIndex], nextPulseBuckets[maxIndex])
 
         # Reject pulse if it is not high enough above the noise floor
         

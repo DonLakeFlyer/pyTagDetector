@@ -29,4 +29,5 @@ class DecimationThread(threading.Thread):
             decimatedBuffer = signal.decimate(decimatedBuffer, 10, ftype='fir')
             decimatedBuffer = signal.decimate(decimatedBuffer, 10, ftype='fir')
             decimatedBuffer = signal.decimate(decimatedBuffer, 8, ftype='fir')
+            #decimatedBuffer = signal.decimate(decimatedBuffer, 2, ftype='fir')
             self._decimatedBuffer.write(decimatedBuffer)

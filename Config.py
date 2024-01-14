@@ -4,7 +4,7 @@ class Config:
     udpIP                       = "127.0.0.1"
     udpPort                     = 10000
     incomingSampleRate          = 3000000
-    k                           = 3
+    k                           = 1
     pulseWidthMSecs             = 150
     pulseWidthSecs              = pulseWidthMSecs / 1000.0
     intraPulseMSecs             = 2000
