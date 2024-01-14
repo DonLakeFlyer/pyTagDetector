@@ -79,6 +79,16 @@ def pyTagDetector():
             plot(stftFreqs, stftBucketTimes, psdSpectro)
         logging.info("stft shape(%s) %d %d %d", psdSpectro.shape, Config.nSTFTSegmentForSinglePulse, Config.nDecimatedIntraPulse, Config.nDecimatedForKPulses)
 
+        # Calculate a noise average for each frequency row in the STFT. Excluding the pulse positions
+        #   The noise average is calculated by averaging the power in each bucket in the row
+            
+        avgNoiseByFreq = numpy.average(psdSpectro, axis = 0)
+
+        # Shift the STFT values up by the noise average such that we now have positive and negative values.
+        # Then when we do the incoherent sum the random noise portions of the signal will cancel each other out to some extent.
+        # Whereas the pulse portions of the signal will add up constructively.         
+
+
         # Create initial pulse position matrix:
         #   It is as large as there are stft buckets
         #   There is a 1 in the position of the buckets which may contain a possible pulse
@@ -90,7 +100,7 @@ def pyTagDetector():
             pulseBucketPositions[index] = 1
             index += Config.nSTFTBucketsIntraPulse
 
-        # Create two dimensional incoherent sum matrixby shifting the pulse position matrix by one bucket at a time
+        # Create two dimensional incoherent sum matrix by shifting the pulse position matrix by one bucket at a time
         #   1, 0, ..., 0
         #   0, 1, ..., 0
         #   ...
@@ -138,7 +148,7 @@ def pyTagDetector():
         logging.info("MAX freq: %f time: %f value: %e noise: %e snr: %e freqIndex: %d", freq, stftBucketTimes[timeIndex], maxPower, avgNoise, 10 * math.log((maxPower - avgNoise) / avgNoise), freqIndex)
 
         #plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoSum.shape[1]], incoSum, freqIndex)
-        #plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectro, freqIndex)
+        plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectro, freqIndex)
         delta = 20
         #plotSurface(stftFreqs[freqIndex-delta:freqIndex+delta], stftBucketTimes, psdSpectro[freqIndex-delta:freqIndex+delta, :])
 

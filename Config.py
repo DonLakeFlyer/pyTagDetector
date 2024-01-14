@@ -21,7 +21,7 @@ class Config:
     nDecimatedPulseJitter       = math.floor(intraPulseJittersSecs * decimatedSampleRate)
     
     stftOverlapFraction                     = 0.5                                                               # 50% overlap
-    nSTFTSegmentForSinglePulse              = nDecimatedPulseWidth                                              # STFT window is large enough to contain a single pulse    
+    nSTFTSegmentForSinglePulse              = math.floor(nDecimatedPulseWidth / 4)                                           # STFT window is large enough to contain a single pulse    
     nSTFTSegmentForSinglePulseOverlap       = math.floor(nSTFTSegmentForSinglePulse * stftOverlapFraction)
     nSTFTSegmentForSinglePulseNotOverlapped = nSTFTSegmentForSinglePulse - nSTFTSegmentForSinglePulseOverlap
     nSTFTBucketsIntraPulse                  = math.floor(nDecimatedIntraPulse / nSTFTSegmentForSinglePulseNotOverlapped)
