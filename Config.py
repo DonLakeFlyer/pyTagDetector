@@ -5,6 +5,8 @@ class Config:
     udpPort                     = 10000
     incomingSampleRate          = 3000000
     k                           = 3
+    kStart                      = 3
+    kEnd                        = 6
     pulseWidthMSecs             = 150
     pulseWidthSecs              = pulseWidthMSecs / 1000.0
     intraPulseMSecs             = 2000
@@ -26,7 +28,11 @@ class Config:
     nSTFTSegmentForSinglePulseNotOverlapped = nSTFTSegmentForSinglePulse - nSTFTSegmentForSinglePulseOverlap
     nSTFTBucketsIntraPulse                  = math.floor(nDecimatedIntraPulse / nSTFTSegmentForSinglePulseNotOverlapped)
     
-    nDecimatedForKPulses        = (k * (nDecimatedIntraPulse + nDecimatedPulseUncertainty)) + nDecimatedPulseJitter + nSTFTSegmentForSinglePulseOverlap
-    nDecimatedOverlap           = 2 * ((k * nDecimatedPulseUncertainty) + nDecimatedPulseJitter)
-    nDecimatedForKPulsesWithOverlap = nDecimatedForKPulses + nDecimatedOverlap
-    nIncomingForKPulses         = nDecimatedForKPulsesWithOverlap * decimationFactor
+    nDecimatedForOnePulse       = nDecimatedIntraPulse
+    nDecimatedOverlap           = 0
+    nIncomingForOnePulse        = nDecimatedForOnePulse * decimationFactor
+
+    #nDecimatedForKPulses        = (k * (nDecimatedIntraPulse + nDecimatedPulseUncertainty)) + nDecimatedPulseJitter + nSTFTSegmentForSinglePulseOverlap
+    #nDecimatedOverlap           = 2 * ((k * nDecimatedPulseUncertainty) + nDecimatedPulseJitter)
+    #nDecimatedForKPulsesWithOverlap = nDecimatedForKPulses + nDecimatedOverlap
+    #nIncomingForKPulses         = nDecimatedForKPulsesWithOverlap * decimationFactor

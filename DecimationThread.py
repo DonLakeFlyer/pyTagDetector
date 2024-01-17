@@ -13,7 +13,7 @@ class DecimationThread(threading.Thread):
         self._incomingBuffer        = incomingBuffer
         self._samplesPerDecimation  = Config.decimationFactor * 1000
         self._countAfterDecimation  = math.floor(self._samplesPerDecimation / Config.decimationFactor)
-        self._decimatedBuffer       = CircularBuffer("Decimator", Config.nDecimatedForKPulses * 3, np.csingle)
+        self._decimatedBuffer       = CircularBuffer("Decimator", Config.nDecimatedForOnePulse * 2, np.csingle)
         self._notifyCondition       = incomingBuffer.registerItemCountCondition(self._samplesPerDecimation)
 
     def decimatedBuffer(self):
