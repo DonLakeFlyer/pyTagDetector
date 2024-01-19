@@ -11,8 +11,8 @@ from matplotlib import cm
 def plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectr, freqIndex):
     plt.ylabel('Power')
     plt.xlabel('Time [sec]')
-    plt.plot(stftBucketTimes, psdSpectr[freqIndex])
-    #plt.show()
+    plt.plot(stftBucketTimes, psdSpectr[freqIndex], '--bo')
+    plt.show()
 
 def plotSurface(stftFreqs, stftBucketTimes, psdSpectro):
     plt.xlabel('Frequency [Hz]')
@@ -136,7 +136,6 @@ def pyTagDetector():
         incoherentSumRow = incoherentSum[freqIndex]
         slice = incoherentSum[freqIndex-5:freqIndex+5, :]
         moving = numpy.convolve(incoherentSumRow, numpy.ones(3), "valid") / 3
-        sRow = psdSpectro[freqIndex]
         freq = stftFreqs[freqIndex]
 
         # Calculate the average noise level in incoherentSum at freqIndex
@@ -147,10 +146,30 @@ def pyTagDetector():
         avgNoise = numpy.average(maxFreqData)
         avgNoise = numpy.average(maxFreqData, weights=weights)
 
+        # Calculate the width of the pulse
+        #   Find the first bucket above the noise floor
+        #   Find the last bucket above the noise floor
+        freqRow = incoherentSum[freqIndex]
+        index = timeIndex
+        firstBucket = 0
+        while index > 0:
+            if freqRow[index] < avgNoise:
+                firstBucket = index
+                break
+            index -= 1
+        index = timeIndex
+        lastBucket = freqRow.shape[0] - 1
+        while index < freqRow.shape[0]:
+            if freqRow[index] < avgNoise:
+                lastBucket = index
+                break
+            index += 1
+        pulseWidthMSecs = math.floor((stftBucketTimes[lastBucket] - stftBucketTimes[firstBucket]) * 1000)
+        
         maxPower = incoherentSum[freqIndex, timeIndex]
-        logging.info("MAX k: %d freq: %f time: %f value: %e noise: %e snr: %e freqIndex: %d", k, freq, stftBucketTimes[timeIndex], maxPower, avgNoise, 10 * math.log((maxPower - avgNoise) / avgNoise), freqIndex)
+        logging.info("MAX k: %d freq: %f time: %f value: %e width: %d noise: %e snr: %e freqIndex: %d", k, freq, stftBucketTimes[timeIndex], maxPower, pulseWidthMSecs,avgNoise, 10 * math.log((maxPower - avgNoise) / avgNoise), freqIndex)
 
-        #plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoherentSum.shape[1]], incoherentSum, 134) #freqIndex)
+        #plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoherentSum.shape[1]], incoherentSum, freqIndex)
         #plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectro, freqIndex)
         delta = 20
         #plotSurface(stftFreqs[freqIndex-delta:freqIndex+delta], stftBucketTimes, psdSpectro[freqIndex-delta:freqIndex+delta, :])
