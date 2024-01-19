@@ -60,6 +60,29 @@ def buildSummationMatrix(nSTFTBuckets):
     
     return summationMatrix
 
+def inchorentSumSimple(psdSpectro, incoherentSum, k):
+    if k > 1:
+        return numpy.add(incoherentSum, psdSpectro)
+    else:
+        return psdSpectro
+
+def inchorentSumToeplitz(psdSpectro, incoherentSum, k, nSTFTBuckets):
+    if k > 1:
+        summationMatrix = buildSummationMatrix(nSTFTBuckets) # Can we move this outside the loop?
+        numpy.concatenate((incoherentSum, psdSpectro), axis=1)
+        return numpy.dot(psdSpectro, summationMatrix)
+    else:
+        return psdSpectro
+
+# Logs the top 10 maxes by frequency and time for one pass
+def logSortedMax(incoherentSum, stftFreqs, stftBucketTimes):
+    sortedFlattenedIndex = numpy.argsort(incoherentSum, axis=None)[::-1]
+    for index in range(10):
+        maxIndex = sortedFlattenedIndex[index]
+        maxFreqIndex = math.floor(maxIndex / incoherentSum.shape[1])
+        maxTimeIndex = maxIndex % incoherentSum.shape[1]
+        logging.info("SORTED freq: %f time: %f value: %e", stftFreqs[maxFreqIndex], stftBucketTimes[maxTimeIndex], incoherentSum[maxFreqIndex, maxTimeIndex])
+
 def pyTagDetector():
     logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s |  %(filename)s:%(lineno)d')
 
@@ -72,6 +95,7 @@ def pyTagDetector():
 
     display = False
     k = 1
+    incoherentSum = None
 
     while True:
         # Wait for enough samples to be decimated to cover one pulse group
@@ -101,23 +125,12 @@ def pyTagDetector():
             plot(stftFreqs, stftBucketTimes, psdSpectro)
         #logging.info("stft shape(%s) %d %d %d", psdSpectro.shape, Config.nSTFTSegmentForSinglePulse, Config.nDecimatedIntraPulse, Config.nDecimatedForOnePulse)
 
-        if k > 1:
-            summationMatrix = buildSummationMatrix(nSTFTBuckets) # Can we move this outside the loop?
-            numpy.concatenate((incoherentSum, psdSpectro), axis=1)
-            incoherentSum = numpy.dot(psdSpectro, summationMatrix)
-        else:
-            incoherentSum = psdSpectro
+        incoherentSum = inchorentSumSimple(psdSpectro, incoherentSum, k)
 
         if display:
             plot(stftFreqs, stftBucketTimes[:incoherentSum.shape[1]], incoherentSum)
 
-        maxFlattenedIndex = numpy.argmax(incoherentSum)
-        #sortedFlattenedIndex = numpy.argsort(incoherentSum, axis=None)[::-1]
-        #for index in range(10):
-        #    maxIndex = sortedFlattenedIndex[index]
-        #    maxFreqIndex = math.floor(maxIndex / incoherentSum.shape[1])
-        #    maxTimeIndex = maxIndex % incoherentSum.shape[1]
-        #    logging.info("SORTED freq: %f time: %f value: %e", stftFreqs[maxFreqIndex], stftBucketTimes[maxTimeIndex], incoherentSum[maxFreqIndex, maxTimeIndex])
+        maxFlattenedIndex = numpy.argmax(incoherentSum)        
         freqIndex = math.floor(maxFlattenedIndex / incoherentSum.shape[1])
         timeIndex = maxFlattenedIndex % incoherentSum.shape[1]
         incoherentSumRow = incoherentSum[freqIndex]
@@ -137,7 +150,7 @@ def pyTagDetector():
         maxPower = incoherentSum[freqIndex, timeIndex]
         logging.info("MAX k: %d freq: %f time: %f value: %e noise: %e snr: %e freqIndex: %d", k, freq, stftBucketTimes[timeIndex], maxPower, avgNoise, 10 * math.log((maxPower - avgNoise) / avgNoise), freqIndex)
 
-        plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoherentSum.shape[1]], incoherentSum, 133) #freqIndex)
+        #plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoherentSum.shape[1]], incoherentSum, 134) #freqIndex)
         #plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectro, freqIndex)
         delta = 20
         #plotSurface(stftFreqs[freqIndex-delta:freqIndex+delta], stftBucketTimes, psdSpectro[freqIndex-delta:freqIndex+delta, :])
@@ -154,8 +167,9 @@ def pyTagDetector():
         
         # Restart summation grouping after specific number of groups
         k += 1
-        if k > 2: #Config.kEnd:
-            plt.show()
+        if k > Config.kEnd:
+            logging.info("RESTART")
+            #plt.show()
             k = 1
 
 if __name__ == '__main__':
