@@ -7,7 +7,7 @@ class Config:
     k                           = 3
     kStart                      = 3
     kEnd                        = 6
-    pulseWidthMSecs             = 150
+    pulseWidthMSecs             = 15
     pulseWidthSecs              = pulseWidthMSecs / 1000.0
     intraPulseMSecs             = 2000
     intraPulseSecs              = intraPulseMSecs / 1000.0
