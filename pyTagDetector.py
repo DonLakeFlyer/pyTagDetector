@@ -12,7 +12,7 @@ def plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectr, freqIndex):
     plt.ylabel('Power')
     plt.xlabel('Time [sec]')
     plt.plot(stftBucketTimes, psdSpectr[freqIndex])
-    plt.show()
+    #plt.show()
 
 def plotSurface(stftFreqs, stftBucketTimes, psdSpectro):
     plt.xlabel('Frequency [Hz]')
@@ -137,7 +137,7 @@ def pyTagDetector():
         maxPower = incoherentSum[freqIndex, timeIndex]
         logging.info("MAX k: %d freq: %f time: %f value: %e noise: %e snr: %e freqIndex: %d", k, freq, stftBucketTimes[timeIndex], maxPower, avgNoise, 10 * math.log((maxPower - avgNoise) / avgNoise), freqIndex)
 
-        #plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoherentSum.shape[1]], incoherentSum, freqIndex)
+        plotSingleFreqIndex(stftFreqs, stftBucketTimes[0:incoherentSum.shape[1]], incoherentSum, 133) #freqIndex)
         #plotSingleFreqIndex(stftFreqs, stftBucketTimes, psdSpectro, freqIndex)
         delta = 20
         #plotSurface(stftFreqs[freqIndex-delta:freqIndex+delta], stftBucketTimes, psdSpectro[freqIndex-delta:freqIndex+delta, :])
@@ -154,7 +154,8 @@ def pyTagDetector():
         
         # Restart summation grouping after specific number of groups
         k += 1
-        if k > Config.kEnd:
+        if k > 2: #Config.kEnd:
+            plt.show()
             k = 1
 
 if __name__ == '__main__':
